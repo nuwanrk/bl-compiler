@@ -1,2 +1,1 @@
-# bl-compiler
-Compiler written in Zig.
+A compiler written in Zig.
