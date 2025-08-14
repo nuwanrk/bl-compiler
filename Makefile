@@ -3,3 +3,6 @@ default:
 
 test:
 	@cd src;zig test *.zig
+
+test1:
+	zig build test
