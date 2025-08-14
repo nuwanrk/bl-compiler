@@ -31,6 +31,46 @@ pub const TokenType = enum {
     }
 };
 
+pub const Token = struct {
+    typ: TokenType,
+    pos: usize,
+    val: []const u8,
+    line: usize,
+
+    pub fn init(typ: TokenType, pos: usize, val: []const u8, line: usize) Token {
+        return Token{ .typ = typ, .pos = pos, .val = val, .line = line };
+    }
+
+    pub fn print(self: Token) void {
+        if (std.mem.eql(u8, self.val, "\n")) {
+            std.debug.print("val = \\n", .{});
+        } else {
+            std.debug.print("val = {s}, ", .{self.val});
+        }
+        std.debug.print("type = {s}", .{self.typ.asstr()});
+        std.debug.print("line = {d}\n", .{self.line});
+    }
+};
+
+pub const LexerOptions = struct {
+    print_tokens: bool,
+
+    pub fn init(print_tokens: bool) LexerOptions {
+        return LexerOptions{ .print_tokens = print_tokens };
+    }
+};
+
+pub const Lexer = struct {
+    input: []const u8,
+    start: usize, // start position of the token
+    pos: usize, // current position of the input
+    at_eof: bool, // end of the input and return eof
+    options: LexerOptions, // config the lexer
+    buffer: std.ArrayList(Token), // buffer to hold the tokens
+
+    pub fn init(input: [])
+};
+
 fn readfile(name: []const u8, alloc: std.mem.Allocator) ![]const u8 {
     const file = try std.fs.cwd().openFile(name, .{});
     defer file.close();
