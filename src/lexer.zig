@@ -68,7 +68,27 @@ pub const Lexer = struct {
     options: LexerOptions, // config the lexer
     buffer: std.ArrayList(Token), // buffer to hold the tokens
 
-    pub fn init(input: [])
+    pub fn init(input: []const u8, options: LexerOptions) Lexer {
+        const start_at = 0;
+        const start_position = 0;
+        const buf = std.ArrayList(Token).init(pageAllocator);
+
+        return Lexer{ .input = input, .start = start_at, .pos = start_position, .at_eof = false, .options = options, .buffer = buf };
+    }
+
+    pub fn deinit(self: Lexer) void {
+        defer self.buffer.deinit();
+    }
+
+    pub fn print(self: Lexer) void {
+        for (self.buffer.items) |item| {
+            item.print();
+        }
+    }
+
+    pub fn size(self: Lexer) void {
+        return self.buffer.items.len;
+    }
 };
 
 fn readfile(name: []const u8, alloc: std.mem.Allocator) ![]const u8 {
