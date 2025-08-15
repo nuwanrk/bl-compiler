@@ -5,35 +5,32 @@ const testing = std.testing;
 const expect = testing.expect;
 const pageAllocator = std.heap.page_allocator;
 
-
 // https://github.com/ziglang/zig/blob/master/lib/std/zig/tokenizer.zig
 pub const Token = struct {
-
     tag: Tag,
-    loc: Loc, 
+    loc: Loc,
 
     // location within the source file for error reporting
     pub const Loc = struct {
         start: usize,
-        end: useize,
+        end: usize,
     };
 
     pub const keywords = std.StaticStringMap(Tag).initComptime(.{
-        .{"fuction", .keyword_function}
-        .{"int", .type_int},
-        .{"return", .keyword_return}, 
-        .{"returns", .keyword_returns},
+        .{ "function", .keyword_function },
+        .{ "int", .type_int },
+        .{ "return", .keyword_return },
+        .{ "returns", .keyword_returns },
+    });
 
-    }); 
-
-    pub fn getKeyword(keyword:[]const u8) ?Tag {
+    pub fn getKeyword(keyword: []const u8) ?Tag {
         return keywords.get(keyword);
     }
 
     pub const Tag = enum {
-        invalid, 
-        identifier, 
-        eof, 
+        invalid,
+        identifier,
+        eof,
 
         exclamation, // !
 
@@ -50,13 +47,13 @@ pub const Token = struct {
         keyword_function,
         keyword_main,
         keyword_returns,
-        keyword_return, 
+        keyword_return,
 
-        pub fn lexem(tag:Tag) ?[]const u8 {
-            return switch(tag) {
+        pub fn lexeme(tag: Tag) ?[]const u8 {
+            return switch (tag) {
                 .invalid,
                 .identifier,
-                .eof, 
+                .eof,
                 .number_literal,
                 => null,
 
@@ -75,123 +72,34 @@ pub const Token = struct {
             };
         }
 
-        pub fn symbol(tag:Tag) []const u8 {
-            return tag.lexem(tag) => orelse switch(tag) {
+        pub fn symbol(tag: Tag) []const u8 {
+            return tag.lexeme(tag) orelse switch (tag) {
                 .invalid => "invalid token",
-                .identifier => "identifier", 
+                .identifier => "identifier",
                 .number_literal => "number",
                 else => unreachable,
             };
         }
     };
-
-    pub fn init(typ: TokenType, pos: usize, val: []const u8, line: usize) Token {
-        return Token{ .typ = typ, .pos = pos, .val = val, .line = line };
-    }
-
-    pub fn print(self: Token) void {
-        if (std.mem.eql(u8, self.val, "\n")) {
-            std.debug.print("val = \\n", .{});
-        } else {
-            std.debug.print("val = {s}, ", .{self.val});
-        }
-        std.debug.print("type = {s}", .{self.typ.asstr()});
-        std.debug.print("line = {d}\n", .{self.line});
-    }
-};
-
-pub const LexerOptions = struct {
-    print_tokens: bool,
-
-    pub fn init(print_tokens: bool) LexerOptions {
-        return LexerOptions{ .print_tokens = print_tokens };
-    }
 };
 
 pub const Lexer = struct {
-    input: []const u8, 
-    start: usize, // start position of the token
-    pos: usize, // current position of the input
-    at_eof: bool, // end of the input and return eof
-    options: LexerOptions, // config the lexer
-    buffer: std.ArrayList(Token), // buffer to hold the tokens
+    buffer: [:0]const u8, // input source
+    index: usize, // index in the source
 
-    pub fn init(options: LexerOptions, input: []const u8) Lexer {
-        const start_at = 0;
-        const start_position = 0;
-        const buf = std.ArrayList(Token).init(pageAllocator);
-
-        return Lexer{ .input = input, .start = start_at, .pos = start_position, .at_eof = false, .options = options, .buffer = buf };
+    // for debugging purposes.
+    pub fn dump(self: *Lexer, token: *const Token) void {
+        std.debug.print("{s} \"{s}\"\n", .{ @tagName(token.Tag), self.buffer[token.loc.start..token.loc.end] });
     }
 
-    pub fn deinit(self: *Lexer) void {
-        defer self.buffer.deinit();
-    }
-
-    pub fn print(self: *Lexer) void {
-        for (self.buffer.items) |item| {
-            item.print();
-        }
-    }
-
-    pub fn size(self: *Lexer) usize {
-        return self.buffer.items.len;
-    }
-
-    pub fn peek(self: *Lexer) u8 {
-        if (self.pos + 1 < self.input.len) {
-            return self.input[self.pos + 1];
-        }
-        return 0;
-    }
-
-    pub fn tokens(self: *Lexer) void {
-        while (true) {
-            const token: Token = self.next();
-            self.buffer.append(token) catch @panic("out of memory occured");
-            if (token.typ == TokenType.eof) {
-                break;
-            }
-        }
-    }
-
-    fn next(self: *Lexer) Token {
-        var line: u8 = 0;
-
-        while (true) : (self.pos += 1) {
-            if (self.pos == self.input.len) {
-                self.at_eof = true;
-                return Token.init(TokenType.eof, self.pos, "", line);
-            }
-            const ch = self.input[self.pos];
-            if (ch == '\n') {
-                line += 1;
-                self.pos += 1;
-                self.start = self.pos;
-                return Token.init(TokenType.newline, self.pos, "\n", line);
-            } else if (ch == ' ') { // skip white spaces
-                self.pos += 1;
-                self.start = self.pos;
-            } else {
-                if (self.pos + 1 < self.input.len) {
-                    const next_ch:u8 = self.peek();
-                }
-                const identifier: []const u8 = self.input[self.start .. self.pos + 1];
-                self.pos += 1;
-                self.start = self.pos;
-                return Token.init(TokenType.identifier, self.pos, identifier, line);
-            }
-        }
+    pub fn init(buffer: [:0]const u8) Lexer {
+        return .{
+            .buffer = buffer,
+            .index = if (std.mem.startsWith(u8, buffer, "\xEF\xBB\xBF")) 3 else 0, // skip UTF-8 BOM if present
+        };
     }
 };
 
 test "test func" {
-    const s = "function ten() returns int { return 10; }";
-
-    const options = LexerOptions.init(true);
-    var lexer = Lexer.init(options, s);
-    lexer.tokens();
-
-    lexer.print();
-    //try expect(11 == lexer.size());
+    _ = "function ten() returns int { return 10; }";
 }
