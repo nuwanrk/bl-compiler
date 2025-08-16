@@ -34,8 +34,8 @@ pub const Token = struct {
 
         exclamation, // !
 
-        l_paran,
-        r_paran,
+        l_paren,
+        r_paren,
         l_brace,
         r_brace,
         semicolon,
@@ -57,8 +57,8 @@ pub const Token = struct {
                 .number_literal,
                 => null,
 
-                .l_paran => "(",
-                .r_paran => ")",
+                .l_paren => "(",
+                .r_paren => ")",
                 .l_brace => "{",
                 .r_brace => "}",
 
@@ -97,6 +97,92 @@ pub const Lexer = struct {
             .buffer = buffer,
             .index = if (std.mem.startsWith(u8, buffer, "\xEF\xBB\xBF")) 3 else 0, // skip UTF-8 BOM if present
         };
+    }
+
+    // token states
+    const State = enum {
+        start,
+        identifier,
+        int,
+        invalid,
+    };
+
+    pub fn next(self: *Lexer) ?Token {
+        var result: Token = .{
+            .tag = undefined,
+            .loc = .{
+                .start = self.index,
+                .end = undefined,
+            },
+        };
+
+        state: switch (State.start) {
+            .start => switch (self.buffer[self.index]) {
+                0 => {
+                    if (self.index == self.buffer.len) {
+                        return .{
+                            .tag = .eof,
+                            .loc = .{
+                                .start = self.index,
+                                .end = self.index,
+                            },
+                        };
+                    } else {
+                        continue :state .invalid;
+                    }
+                },
+
+                ' ', '\n', '\t', '\r' => { // skip whitespaces
+                    self.index += 1;
+                    result.loc.start = self.index;
+                    continue :state .start;
+                },
+                'a'...'z', 'A'...'Z', '_' => {
+                    result.tag = .identifier;
+                    continue :state .identifier;
+                },
+                '0'...'9' => {
+                    result.tag = .number_literal;
+                    self.index += 1;
+                    continue :state .int;
+                },
+                '(' => {
+                    result.tag = .l_paren;
+                    self.index += 1;
+                },
+                ')' => {
+                    result.tag = .r_paren;
+                    self.index += 1;
+                },
+                ';' => {
+                    result.tag = .semicolon;
+                    self.index += 1;
+                },
+                '{' => {
+                    result.tag = .l_brace;
+                    self.index += 1;
+                },
+                '}' => {
+                    result.tag = .r_brace;
+                    self.index += 1;
+                },
+                else => result.tag = .invalid,
+            },
+
+            .identifier => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    'a'...'z', 'A'...'Z', '_', '0'...'9' => continue :state .identifier,
+                    else => {
+                        const ident = self.buffer[result.loc.start..self.index];
+                        if (Token.getKeyword(ident)) |tag| {
+                            // found a keyword
+                            result.tag = tag;
+                        }
+                    },
+                }
+            },
+        }
     }
 };
 
