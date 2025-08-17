@@ -182,7 +182,18 @@ pub const Lexer = struct {
                     },
                 }
             },
+
+            .int => switch (self.buffer[self.index]) {
+                '0'...'9' => {
+                    self.index += 1;
+                    continue :state .int;
+                },
+                'a'...'z', 'A'...'Z' => result.tag = .invalid,
+                else => {},
+            },
         }
+        result.loc.end = self.index;
+        return result;
     }
 };
 
