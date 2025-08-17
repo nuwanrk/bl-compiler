@@ -191,6 +191,10 @@ pub const Lexer = struct {
                 'a'...'z', 'A'...'Z' => result.tag = .invalid,
                 else => {},
             },
+
+            .invalid => {
+                std.debug.print("error=>handle invalid", .{});
+            },
         }
         result.loc.end = self.index;
         return result;
