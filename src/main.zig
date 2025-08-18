@@ -45,6 +45,7 @@ pub fn run(allocator: std.mem.Allocator, args: Args) !void {
 
             switch (token.tag) {
                 .invalid => return error.LexerError,
+                .eof => break,
                 else => {},
             }
         }
