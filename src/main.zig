@@ -10,10 +10,10 @@ pub fn main() !void {
     }).init;
     defer _ = debugAllocator.deinit();
 
-    //const gpa = debugAllocator.allocator();
+    const gpa = debugAllocator.allocator();
 
-    _ = try parseArgs();
-    //try run(gpa, args);
+    const args = try parseArgs();
+    try run(gpa, args);
 }
 
 pub fn run(allocator: std.mem.Allocator, args: Args) !void {
@@ -67,7 +67,7 @@ pub fn run(allocator: std.mem.Allocator, args: Args) !void {
 }
 
 const Args = struct {
-    path: [:0]const u8,
+    path: []const u8,
     mode: Mode,
 };
 
@@ -106,56 +106,21 @@ fn parseArgs() !Args {
     var args = std.process.args();
     _ = args.skip(); // skip program name
 
-    var path: []const u8;
+    var path: []const u8 = "";
     var mode: Mode = .compile;
 
+    var index: u8 = 0;
     while (args.next()) |arg| {
-        if (arg[0] == '-') {
-            mode = std.meta.stringToEnum(Mode, arg[2..]) orelse
+        if (index > 1) {
+            return error.InvalidArguments;
+        } else if (index == 0) {
+            mode = std.meta.stringToEnum(Mode, arg[0..]) orelse
                 return error.UnrecognizedFlag;
-        } else if (path == null) {
-            path = arg;
         } else {
-            return error.PathDuplicated;
+            path = arg;
         }
+        index += 1;
     }
 
     return .{ .path = path, .mode = mode };
-}
-
-fn readfile(name: []const u8, alloc: std.mem.Allocator) ![]const u8 {
-    const file = try std.fs.cwd().openFile(name, .{});
-    defer file.close();
-
-    const stat = try file.stat();
-    const size = stat.size;
-    return try file.reader().readAllAlloc(alloc, size);
-}
-
-test "readfile" {
-    const s = "assets/func1.bal";
-    const content = try readfile(s, testAllocator);
-    defer testAllocator.free(content);
-    std.debug.print("{s}\n", .{content});
-}
-
-test "lexer" {
-    const input = "123 67 89, 99";
-    const gpa = std.testing.allocator;
-
-    var list = std.ArrayList(u32).init(gpa);
-    defer list.deinit();
-
-    var it = std.mem.tokenizeAny(u8, input, " ,");
-    while (it.next()) |num| {
-        const n = try parseInt(u32, num, 10);
-        try list.append(n);
-    }
-
-    const expected = [_]u32{ 123, 67, 89, 99 };
-    for (expected, list.items) |exp, actual| {
-        try std.testing.expectEqual(exp, actual);
-    }
-
-    std.debug.print("test passed\n", .{});
 }
